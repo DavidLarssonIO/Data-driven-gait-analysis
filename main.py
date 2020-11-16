@@ -4,8 +4,8 @@ import holoviews as hv
 hv.extension('bokeh')
 import seaborn as sns
 
-from dataframe_functions import *
-from plotting_functions import *
+from functions.dataframe_functions import *
+from functions.plotting_functions import *
 
 path_first = "../matlab_report-master/Treadmill/Test/Torsby/"
 path_int = [1,2,3,4,5,6,7,8]
