@@ -15,7 +15,7 @@ def timeseries_per_skier(df,df_peaks):
                       "Height stop",
                       "Ground contact stop",
                       "Stroke stop",
-                      "Impulse"])
+                      "Force area"])
     scatter_peaks = peaks.to.scatter('Peak time', 'Peak height').opts(color='k', marker='^', size=5)
     scatter_start = peaks.to.scatter("Stroke and ground contact start", 'Height start').opts(color='g', marker='>', size=5)
     scatter_stop = peaks.to.scatter("Ground contact stop", 'Height stop').opts(color='r', marker='<', size=5)
