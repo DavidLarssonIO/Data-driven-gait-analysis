@@ -36,4 +36,4 @@ for i in path_int:
         df_info_right = df_info_right.append(df_info_right_tmp, ignore_index=True)
 
 plot = timeseries_per_skier(df, df_peaks_left)
-hv.save(plot, "Timeseries.html")
+hv.save(plot, "figures/Timeseries.html")

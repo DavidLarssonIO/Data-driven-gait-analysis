@@ -27,4 +27,4 @@ df_sub = df_info_left[["Gear","Stroke time","Ground contact time","Air time","Fr
 ds = hv.Dataset(df_sub).groupby('Gear').overlay()
 point_grid = gridmatrix(ds, diagonal_type=hv.Distribution, chart_type=hv.Points)
 point_grid.opts(opts.Points(size=2, alpha=0.5),opts.NdOverlay(batched=False))
-hv.save(point_grid, 'Points.html')
+hv.save(point_grid, 'figures/Points.html')
