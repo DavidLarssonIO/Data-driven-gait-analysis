@@ -1,10 +1,58 @@
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks, peak_widths
-from scipy.interpolate import interp1d
-from scipy.ndimage import convolve1d
-from bisect import bisect
 from sklearn.neighbors import NearestNeighbors
+
+
+def get_dataframe(filepath_list, skier_list):
+    for j in range(len(skier_list)):
+        i = skier_list[j]
+        filepath = filepath_list[j]
+        if i == skier_list[0]:
+            df, df_peaks_left, df_peaks_right, df_info_left, df_info_right = generate_stroke_dataframe(
+                filepath, i
+            )
+            df_peaks = df_peaks_left
+            df_peaks = df_peaks.append(df_peaks_right, ignore_index=True)
+            df_info = df_info_left
+            df_info = df_info.append(df_info_right, ignore_index=True)
+        else:
+            df_tmp, df_peaks_left_tmp, df_peaks_right_tmp, df_info_left_tmp, df_info_right_tmp = generate_stroke_dataframe(
+                filepath, i
+            )
+            df = df.append(df_tmp, ignore_index=True)
+            df_peaks = df_peaks.append(df_peaks_left_tmp, ignore_index=True)
+            df_peaks = df_peaks.append(df_peaks_right_tmp, ignore_index=True)
+            df_info = df_info.append(df_info_left_tmp, ignore_index=True)
+            df_info = df_info.append(df_info_right_tmp, ignore_index=True)
+    return df, df_peaks, df_info
+
+
+def generate_stroke_dataframe(filepath, i):
+    df = ImportData(filepath, i)
+
+    df["Time (sec)"] = np.linspace(
+        np.min(df["Time (sec)"]), np.max(df["Time (sec)"]), len(df.index)
+    )
+    df["Time (min)"] = np.linspace(
+        np.min(df["Time (min)"]), np.max(df["Time (min)"]), len(df.index)
+    )
+
+    int_add = np.sum(df["Time (sec)"].values <= 12)
+    df["Gear"] = df["Gear"].shift(periods=int_add, fill_value=df["Gear"][0])
+
+    df_peaks_left = GetStrokes(
+        df["Force left (N)"], df["Gear"], df["Time (sec)"], df["Skier"], 0
+    )
+    df_peaks_right = GetStrokes(
+        df["Force right (N)"], df["Gear"], df["Time (sec)"], df["Skier"], 1
+    )
+    df_info_left = GetInfo(df_peaks_left)
+    df_info_right = GetInfo(df_peaks_right)
+    df_info_left, df_info_right = add_left_and_right_diff(
+        df_peaks_left, df_peaks_right, df_info_left, df_info_right
+    )
+    return df, df_peaks_left, df_peaks_right, df_info_left, df_info_right
 
 
 def ImportData(filepath, skier):
@@ -41,14 +89,16 @@ def GetStrokes(
     cutoff_end=2,
 ):
     height = height * np.max(df_force)
-    # rel_height=0.93,
-    # height=25
     # Updating the cutoff at the end
     cutoff_end = df_time.values[-1] - cutoff_end
     # Getting the peaks from force data
-    peaks, _ = find_peaks(df_force, height=height, width=width, distance=distance)
+    peaks, _ = find_peaks(
+        df_force, height=height, width=width, distance=distance
+    )
     # Getting the start and stop possition of groundcontact, with interpolation
-    _, _, left_ips, right_ips = peak_widths(df_force, peaks, rel_height=rel_height)
+    _, _, left_ips, right_ips = peak_widths(
+        df_force, peaks, rel_height=rel_height
+    )
     # Rounding to get rid of interpolation
     left_ips = np.floor(left_ips)
     right_ips = np.ceil(right_ips)
@@ -97,19 +147,6 @@ def GetStrokes(
     df_peaks = pd.DataFrame(data)
     # Deleate last value
     df_peaks.drop(df_peaks.tail(1).index, inplace=True)
-    print(df_peaks)
-    gear_shift = df_gear.values
-    gear_shift = np.diff(gear_shift)
-    gear_shift = np.abs(gear_shift)
-    gear_shift = np.append([0], gear_shift)
-    gear_shift = gear_shift > 0
-    gear_shift = list(map(int, gear_shift))
-    time_to_delete = 10
-    index_to_delete = int(time_to_delete / (df_time.values[1] - df_time.values[0]))
-    to_keep = convolve1d(gear_shift, weights=index_to_delete * [1]) == 0
-    to_keep = df_time[to_keep]
-    df_peaks = df_peaks[df_peaks["Peak time"].isin(to_keep)]
-    print(df_peaks)
     return df_peaks
 
 
@@ -122,7 +159,9 @@ def GetInfo(df_peaks):
         df_peaks["Ground contact stop"].values
         - df_peaks["Stroke and ground contact start"].values
     )
-    air_time = df_peaks["Stroke stop"].values - df_peaks["Ground contact stop"].values
+    air_time = (
+        df_peaks["Stroke stop"].values - df_peaks["Ground contact stop"].values
+    )
 
     data = {
         "Gear": df_peaks["Gear"].values,
@@ -139,97 +178,20 @@ def GetInfo(df_peaks):
     return df_info
 
 
-def generate_stroke_dataframe(filepath, i):
-    df = ImportData(filepath, i)
-    # df = df.sort_values(by=["Time (sec)"])
-    # print("First: " + str(len(df.index)))
-    # df = df.drop_duplicates(subset=["Time (sec)"], ignore_index=True)
-    # print("Second: " + str(len(df.index)))
-    # index_to_keep = [True]
-    # index_to_keep.extend(np.diff(df["Time (sec)"])>0.006)
-    # print(index_to_keep)
-    # df = df[index_to_keep]
-    # df = df.reset_index(drop=True)
-    df["Time (sec)"] = np.linspace(
-        np.min(df["Time (sec)"]), np.max(df["Time (sec)"]), len(df.index)
-    )
-    df["Time (min)"] = np.linspace(
-        np.min(df["Time (min)"]), np.max(df["Time (min)"]), len(df.index)
-    )
-
-    # force_left = df["Force left (N)"].values
-    # force_right = df["Force right (N)"].values
-    # time_left = df["Time (sec)"].values
-    # time_right = time_left
-    # Deleting every 1000 element
-    # del_n = int(len(df.index) * 1 / 125)
-    # del_n = 800
-    # force_left = np.delete(force_left, np.arange(del_n, force_left.size, del_n))
-    # time_left = np.diff(time_left)
-    # time_left = np.insert(time_left, 0, 0)
-    # time_left = np.delete(time_left, np.arange(del_n, time_left.size, del_n))
-    # time_left = np.cumsum(time_left)
-    # df = df[: len(time_left)]
-    # fun_left = interp1d(time_left, force_left, fill_value="extrapolate")
-    # fun_right = interp1d(time_right, force_right, fill_value="extrapolate")
-    # df["Force left (N)"] = fun_left(time_left)
-    # df["Force right (N)"] = fun_right(time_left)
-    int_add = np.sum(df["Time (sec)"].values <= 12)
-    df["Gear"] = df["Gear"].shift(periods=int_add, fill_value=df["Gear"][0])
-    # df["Force left (N)"] = df["Force left (N)"].shift(periods=70, fill_value=0)
-    df_peaks_left = GetStrokes(
-        df["Force left (N)"], df["Gear"], df["Time (sec)"], df["Skier"], 0
-    )
-    df_peaks_right = GetStrokes(
-        df["Force right (N)"], df["Gear"], df["Time (sec)"], df["Skier"], 1
-    )
-    df_info_left = GetInfo(df_peaks_left)
-    df_info_right = GetInfo(df_peaks_right)
-    df_info_left, df_info_right = add_left_and_right_diff(
-        df_peaks_left, df_peaks_right, df_info_left, df_info_right
-    )
-    return df, df_peaks_left, df_peaks_right, df_info_left, df_info_right
-
-
-def get_dataframe(filepath_list, skier_list):
-    for j in range(len(skier_list)):
-        i = skier_list[j]
-        filepath = filepath_list[j]
-        if i == skier_list[0]:
-            df, df_peaks_left, df_peaks_right, df_info_left, df_info_right = generate_stroke_dataframe(
-                filepath, i
-            )
-            df_peaks = df_peaks_left
-            df_peaks = df_peaks.append(df_peaks_right, ignore_index=True)
-            df_info = df_info_left
-            df_info = df_info.append(df_info_right, ignore_index=True)
-        else:
-            df_tmp, df_peaks_left_tmp, df_peaks_right_tmp, df_info_left_tmp, df_info_right_tmp = generate_stroke_dataframe(
-                filepath, i
-            )
-            df = df.append(df_tmp, ignore_index=True)
-            df_peaks = df_peaks.append(df_peaks_left_tmp, ignore_index=True)
-            df_peaks = df_peaks.append(df_peaks_right_tmp, ignore_index=True)
-            df_info = df_info.append(df_info_left_tmp, ignore_index=True)
-            df_info = df_info.append(df_info_right_tmp, ignore_index=True)
-    return df, df_peaks, df_info
-
-
-def add_left_and_right_diff(df_peaks_left, df_peaks_right, df_info_left, df_info_right):
-    test_string = "Ground contact stop"
-    test_string = "Stroke and ground contact start"
-    test_sting = "Peak time"
+def add_left_and_right_diff(
+    df_peaks_left, df_peaks_right, df_info_left, df_info_right
+):
     nbrs_left = NearestNeighbors(n_neighbors=1, n_jobs=-1).fit(
-        np.transpose([df_peaks_left[test_string].values])
+        np.transpose([df_peaks_left["Peak time"].values])
     )
     nbrs_right = NearestNeighbors(n_neighbors=1, n_jobs=-1).fit(
-        np.transpose([df_peaks_right[test_string].values])
+        np.transpose([df_peaks_right["Peak time"].values])
     )
     times_right, indices_right = nbrs_left.kneighbors(
-        np.transpose([df_peaks_right[test_string].values])
+        np.transpose([df_peaks_right["Peak time"].values])
     )
     times_left, indices_left = nbrs_right.kneighbors(
-        np.transpose([df_peaks_left[test_string].values])
+        np.transpose([df_peaks_left["Peak time"].values])
     )
     df_info_left["Time to other pole"] = (
         np.transpose(times_left)[0] / df_info_left["Stroke time"].values

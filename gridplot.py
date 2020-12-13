@@ -31,10 +31,10 @@ if len(df_sub.index) > 7000:
     df_sub = df_sub.sample(7000)
 ds = hv.Dataset(df_sub).groupby("Gear").overlay()
 point_grid = gridmatrix(ds, chart_type=hv.Points)  # diagonal_type=hv.Distribution
-point_grid.opts(opts.Points(size=1, alpha=0.3, tools=["hover", "box_select"]))
+point_grid.opts(opts.Points(size=1, alpha=0.3, cmap="Plasma"))
 legend = point_grid[("Frequency", "Time to other pole")].opts(
     xaxis=None, yaxis=None, legend_position="top_left", show_frame=False, width=150
 )
 # legend = point_grid[("Frequency", "Impulse axial")].opts(
-legend.opts(opts.Points(size=0, alpha=1))
+# legend.opts(opts.Points(size=0, alpha=1))
 hv.save(point_grid + legend, "figures/Points.html")

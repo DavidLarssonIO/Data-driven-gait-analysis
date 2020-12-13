@@ -1,4 +1,3 @@
-import pandas as pd
 import holoviews as hv
 
 hv.extension("bokeh")
@@ -11,11 +10,7 @@ skier_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 path_second = "/CSV/csvData.csv"
 filepath_list = [path_first + str(i) + path_second for i in skier_list]
 
-df, df_peaks, df_info = get_dataframe(filepath_list, skier_list)
-import numpy as np
+df, df_peaks, _ = get_dataframe(filepath_list, skier_list)
 
-# tmp = np.diff(df["Time (sec)"])
-# for i in tmp:
-#   print(i)
 plot = timeseries_per_skier(df, df_peaks[df_peaks["Pole"] == 1])
 hv.save(plot, "figures/Timeseries.html")
