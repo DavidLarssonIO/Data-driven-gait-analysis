@@ -28,7 +28,55 @@ def get_dataframe(filepath_list, skier_list):
     return df, df_peaks, df_info
 
 
+def get_dataframe_with_shift(filepath_list, skier_list):
+    for j in range(len(skier_list)):
+        i = skier_list[j]
+        filepath = filepath_list[j]
+        if i == skier_list[0]:
+            df, df_peaks_left, df_peaks_right, df_info_left, df_info_right = generate_stroke_dataframe_with_shift(
+                filepath, i
+            )
+            df_peaks = df_peaks_left
+            df_peaks = df_peaks.append(df_peaks_right, ignore_index=True)
+            df_info = df_info_left
+            df_info = df_info.append(df_info_right, ignore_index=True)
+        else:
+            df_tmp, df_peaks_left_tmp, df_peaks_right_tmp, df_info_left_tmp, df_info_right_tmp = generate_stroke_dataframe_with_shift(
+                filepath, i
+            )
+            df = df.append(df_tmp, ignore_index=True)
+            df_peaks = df_peaks.append(df_peaks_left_tmp, ignore_index=True)
+            df_peaks = df_peaks.append(df_peaks_right_tmp, ignore_index=True)
+            df_info = df_info.append(df_info_left_tmp, ignore_index=True)
+            df_info = df_info.append(df_info_right_tmp, ignore_index=True)
+    return df, df_peaks, df_info
+
+
 def generate_stroke_dataframe(filepath, i):
+    df = ImportData(filepath, i)
+
+    df["Time (sec)"] = np.linspace(
+        np.min(df["Time (sec)"]), np.max(df["Time (sec)"]), len(df.index)
+    )
+    df["Time (min)"] = np.linspace(
+        np.min(df["Time (min)"]), np.max(df["Time (min)"]), len(df.index)
+    )
+
+    df_peaks_left = GetStrokes(
+        df["Force left (N)"], df["Gear"], df["Time (sec)"], df["Skier"], 0
+    )
+    df_peaks_right = GetStrokes(
+        df["Force right (N)"], df["Gear"], df["Time (sec)"], df["Skier"], 1
+    )
+    df_info_left = GetInfo(df_peaks_left)
+    df_info_right = GetInfo(df_peaks_right)
+    df_info_left, df_info_right = add_left_and_right_diff(
+        df_peaks_left, df_peaks_right, df_info_left, df_info_right
+    )
+    return df, df_peaks_left, df_peaks_right, df_info_left, df_info_right
+
+
+def generate_stroke_dataframe_with_shift(filepath, i):
     df = ImportData(filepath, i)
 
     df["Time (sec)"] = np.linspace(

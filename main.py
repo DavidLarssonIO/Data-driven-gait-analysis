@@ -1,9 +1,7 @@
+from functions.dataframe_functions import get_dataframe
+from functions.plotting_functions import timeseries_per_skier
 import holoviews as hv
-
 hv.extension("bokeh")
-
-from functions.dataframe_functions import *
-from functions.plotting_functions import *
 
 path_first = "../matlab_report-master/Treadmill/Test/Torsby/"
 skier_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
