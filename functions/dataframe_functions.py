@@ -86,6 +86,7 @@ def generate_stroke_dataframe(filepath, i):
     """
     # Reading CSV
     df = ImportData(filepath, i)
+    # Shifting the timeseries 12 seconds
     int_add = np.sum(df["Time (sec)"].values <= 12)
     df["Gear"] = df["Gear"].shift(periods=int_add, fill_value=df["Gear"][0])
     # Needing to fix the timeseries, using the same method as MATLAB
