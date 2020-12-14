@@ -61,63 +61,6 @@ def get_dataframe(filepath_list, skier_list):
     return df, df_peaks, df_info
 
 
-def get_dataframe_with_shift(filepath_list, skier_list):
-    """The main function to call to generate all dataframes
-    Parameters
-    ----------
-    filepath_list : list of strings
-        A list of the filepath for the CSV files for the source files
-    skier_list : list of ints
-        A list of the indentity of the different skiers.
-
-    Returns
-    -------
-    df : dataframe
-        Dataframe over the timeseries data
-    df_peaks : dataframe
-        Dataframe over the stroke information on a timeseries basis
-    df_info : dataframe
-        Dataframe over individual pulling, the dataframe for doing
-        machine learning since it doesn't contain any timeseries information
-    """
-    for j in range(len(skier_list)):
-        i = skier_list[j]
-        filepath = filepath_list[j]
-        # If it's the first call we save to variables without append, else with
-        # append
-        if i == skier_list[0]:
-            # Calling the generate_stroke_dataframe to get all of the data
-            dataframe_dict = generate_stroke_dataframe_with_shift(filepath, i)
-            # Saving the data to variables
-            df = dataframe_dict["df"]
-            df_peaks = dataframe_dict["df_peaks_left"]
-            df_peaks = df_peaks.append(
-                dataframe_dict["df_peaks_right"], ignore_index=True
-            )
-            df_info = dataframe_dict["df_info_left"]
-            df_info = df_info.append(
-                dataframe_dict["df_info_right"], ignore_index=True
-            )
-        else:
-            # Calling generate_stroke_dataframe for the rest of the skiers
-            dataframe_dict = generate_stroke_dataframe_with_shift(filepath, i)
-            # Appending the data to variables
-            df = df.append(dataframe_dict["df"], ignore_index=True)
-            df_peaks = df_peaks.append(
-                dataframe_dict["df_peaks_left"], ignore_index=True
-            )
-            df_peaks = df_peaks.append(
-                dataframe_dict["df_peaks_right"], ignore_index=True
-            )
-            df_info = df_info.append(
-                dataframe_dict["df_info_left"], ignore_index=True
-            )
-            df_info = df_info.append(
-                dataframe_dict["df_info_right"], ignore_index=True
-            )
-    return df, df_peaks, df_info
-
-
 def generate_stroke_dataframe(filepath, i):
     """ Function to call when getting data from one skier
     Parameters
@@ -148,53 +91,37 @@ def generate_stroke_dataframe(filepath, i):
     df_peaks_right = GetStrokes(df, "Right")
     df_info_left = GetInfo(df_peaks_left)
     df_info_right = GetInfo(df_peaks_right)
+    # Adding the time between nearest left and right pulling
+    df_info_left, df_info_right = add_left_and_right_diff(
+        df_peaks_left, df_peaks_right, df_info_left, df_info_right
+    )
+    left_0 = df_peaks_left[df_peaks_left["Gear"] == 0][10:90]
+    left_0 = left_0["Peak time"].values
+    right_0 = df_info_left[df_info_left["Gear"] == 0][10:90]
+    right_0 = right_0["Other pole time"].values
+    x = left_0
+    y = left_0 - right_0
+    k, m = np.polyfit(x, y, 1)
+    time = df["Time (sec)"].values
+    comp = k * np.linspace(np.min(time), np.max(time), len(time)) + m
+    time = time - comp
+    df["Force right (N)"] = np.interp(
+        time, df["Time (sec)"], df["Force right (N)"], left=0, right=0
+    )
+    df["Time (sec)"] = time
+    df["Time (min)"] = time / 60
+
+    df_peaks_left = GetStrokes(df, "Left")
+    df_peaks_right = GetStrokes(df, "Right")
+
+    df_info_left = GetInfo(df_peaks_left)
+    df_info_right = GetInfo(df_peaks_right)
 
     # Adding the time between nearest left and right pulling
     df_info_left, df_info_right = add_left_and_right_diff(
         df_peaks_left, df_peaks_right, df_info_left, df_info_right
     )
     # Saving it all to a dictionary
-    dataframe_dict = {
-        "df": df,
-        "df_peaks_left": df_peaks_left,
-        "df_peaks_right": df_peaks_right,
-        "df_info_left": df_info_left,
-        "df_info_right": df_info_right,
-    }
-    return dataframe_dict
-
-
-def generate_stroke_dataframe_with_shift(filepath, i):
-    """
-    Parameters
-    ----------
-    test : type
-        desc
-
-    Returns
-    -------
-    test : type
-        desc
-    """
-    df = ImportData(filepath, i)
-
-    df["Time (sec)"] = np.linspace(
-        np.min(df["Time (sec)"]), np.max(df["Time (sec)"]), len(df.index)
-    )
-    df["Time (min)"] = np.linspace(
-        np.min(df["Time (min)"]), np.max(df["Time (min)"]), len(df.index)
-    )
-
-    int_add = np.sum(df["Time (sec)"].values <= 12)
-    df["Gear"] = df["Gear"].shift(periods=int_add, fill_value=df["Gear"][0])
-
-    df_peaks_left = GetStrokes(df, "Left")
-    df_peaks_right = GetStrokes(df, "Right")
-    df_info_left = GetInfo(df_peaks_left)
-    df_info_right = GetInfo(df_peaks_right)
-    df_info_left, df_info_right = add_left_and_right_diff(
-        df_peaks_left, df_peaks_right, df_info_left, df_info_right
-    )
     dataframe_dict = {
         "df": df,
         "df_peaks_left": df_peaks_left,
@@ -426,13 +353,21 @@ def add_left_and_right_diff(
     times_left, indices_left = nbrs_right.kneighbors(
         np.transpose([df_peaks_left["Peak time"].values])
     )
-    # Converting to a proventage
-    df_info_left["Time to other pole"] = (
-        np.transpose(times_left)[0] / df_info_left["Stroke time"].values
-    )
-    df_info_right["Time to other pole"] = (
-        np.transpose(times_right)[0] / df_info_right["Stroke time"].values
-    )
+    # Save to dataframe
+    df_info_left["Time to other pole"] = np.transpose(times_left)[
+        0
+    ]  # / df_info_left["Stroke time"].values
+    df_info_right["Time to other pole"] = np.transpose(times_right)[
+        0
+    ]  # / df_info_right["Stroke time"].values
+
+    df_info_left["Other pole time"] = df_info_right.loc[
+        indices_left.flatten(), "Peak time"
+    ].values
+    df_info_right["Other pole time"] = df_info_left.loc[
+        indices_right.flatten(), "Peak time"
+    ].values
+
     # Saving the height of the peak to a variable from dataframe
     height_left = df_peaks_left["Peak height"].reset_index(drop=True)
     height_right = df_peaks_right["Peak height"].reset_index(drop=True)

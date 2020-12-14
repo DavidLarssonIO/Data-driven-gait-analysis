@@ -1,14 +1,12 @@
-from functions.dataframe_functions import get_dataframe
+import pandas as pd
 from functions.plotting_functions import timeseries_per_skier
 import holoviews as hv
+
 hv.extension("bokeh")
 
-path_first = "../matlab_report-master/Treadmill/Test/Torsby/"
-skier_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-path_second = "/CSV/csvData.csv"
-filepath_list = [path_first + str(i) + path_second for i in skier_list]
 
-df, df_peaks, _ = get_dataframe(filepath_list, skier_list)
+df = pd.read_pickle("./data/timeseries.pkl")
+df_peaks = pd.read_pickle("./data/peaks.pkl")
 
-plot = timeseries_per_skier(df, df_peaks[df_peaks["Pole"] == 1])
+plot = timeseries_per_skier(df, df_peaks[df_peaks["Pole"] == "Right"])
 hv.save(plot, "figures/Timeseries.html")

@@ -2,6 +2,17 @@ import holoviews as hv
 
 
 def timeseries_per_skier(df, df_peaks):
+    """
+    Parameters
+    ----------
+    test : type
+        desc
+
+    Returns
+    -------
+    test : type
+        desc
+    """
     force_time = hv.Table(
         df,
         ["Skier"],
@@ -20,7 +31,7 @@ def timeseries_per_skier(df, df_peaks):
             "Height stop",
             "Ground contact stop",
             "Stroke stop",
-            "Force area",
+            "Impulse axial",
         ],
     )
     scatter_peaks = peaks.to.scatter("Peak time", "Peak height").opts(
