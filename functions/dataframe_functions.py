@@ -5,11 +5,14 @@ from sklearn.neighbors import NearestNeighbors
 
 
 def get_dataframe(filepath_list, skier_list):
-    """The main function to call to generate all dataframes
+    """
+    The main function to call to generate all dataframes
+
     Parameters
     ----------
     filepath_list : list of strings
-        A list of the filepath for the CSV files for the source files
+        A list of the filepath for the CSV files for the source file
+
     skier_list : list of ints
         A list of the indentity of the different skiers.
 
@@ -17,8 +20,10 @@ def get_dataframe(filepath_list, skier_list):
     -------
     df : dataframe
         Dataframe over the timeseries data
+
     df_peaks : dataframe
         Dataframe over the stroke information on a timeseries basis
+
     df_info : dataframe
         Dataframe over individual pulling, the dataframe for doing
         machine learning since it doesn't contain any timeseries information
@@ -61,14 +66,80 @@ def get_dataframe(filepath_list, skier_list):
     return df, df_peaks, df_info
 
 
+def get_dataframe_with_shift(filepath_list, skier_list):
+    """
+    The main function to call to generate all dataframes
+
+    Parameters
+    ----------
+    filepath_list : list of strings
+        A list of the filepath for the CSV files for the source files
+
+    skier_list : list of ints
+        A list of the indentity of the different skiers.
+
+    Returns
+    -------
+    df : dataframe
+        Dataframe over the timeseries data
+
+    df_peaks : dataframe
+        Dataframe over the stroke information on a timeseries basis
+
+    df_info : dataframe
+        Dataframe over individual pulling, the dataframe for doing
+        machine learning since it doesn't contain any timeseries information
+    """
+    for j in range(len(skier_list)):
+        i = skier_list[j]
+        filepath = filepath_list[j]
+        # If it's the first call we save to variables without append, else with
+        # append
+        if i == skier_list[0]:
+            # Calling the generate_stroke_dataframe to get all of the data
+            dataframe_dict = generate_stroke_dataframe_with_shift(filepath, i)
+            # Saving the data to variables
+            df = dataframe_dict["df"]
+            df_peaks = dataframe_dict["df_peaks_left"]
+            df_peaks = df_peaks.append(
+                dataframe_dict["df_peaks_right"], ignore_index=True
+            )
+            df_info = dataframe_dict["df_info_left"]
+            df_info = df_info.append(
+                dataframe_dict["df_info_right"], ignore_index=True
+            )
+        else:
+            # Calling generate_stroke_dataframe for the rest of the skiers
+            dataframe_dict = generate_stroke_dataframe_with_shift(filepath, i)
+            # Appending the data to variables
+            df = df.append(dataframe_dict["df"], ignore_index=True)
+            df_peaks = df_peaks.append(
+                dataframe_dict["df_peaks_left"], ignore_index=True
+            )
+            df_peaks = df_peaks.append(
+                dataframe_dict["df_peaks_right"], ignore_index=True
+            )
+            df_info = df_info.append(
+                dataframe_dict["df_info_left"], ignore_index=True
+            )
+            df_info = df_info.append(
+                dataframe_dict["df_info_right"], ignore_index=True
+            )
+    return df, df_peaks, df_info
+
+
 def generate_stroke_dataframe(filepath, i):
-    """ Function to call when getting data from one skier
+    """
+    Function to call when getting data from one skier
+
     Parameters
     ----------
     filepath : str
         Filepath for the specific skier
+
     i : int
         Skier indentity
+
     Returns
     -------
     dataframe_dict : dict
@@ -121,6 +192,85 @@ def generate_stroke_dataframe(filepath, i):
     df_info_left, df_info_right = add_left_and_right_diff(
         df_peaks_left, df_peaks_right, df_info_left, df_info_right
     )
+
+    # Saving it all to a dictionary
+    dataframe_dict = {
+        "df": df,
+        "df_peaks_left": df_peaks_left,
+        "df_peaks_right": df_peaks_right,
+        "df_info_left": df_info_left,
+        "df_info_right": df_info_right,
+    }
+    return dataframe_dict
+
+
+def generate_stroke_dataframe_with_shift(filepath, i):
+    """
+    Function to call when getting data from one skier
+
+    Parameters
+    ----------
+    filepath : str
+        Filepath for the specific skier
+
+    i : int
+        Skier indentity
+
+    Returns
+    -------
+    dataframe_dict : dict
+        A dictionary with keys "df", "df_peaks_left", "df_peaks_right",
+        "df_info_left", "df_info_right" which are all dataframes
+    """
+    # Reading CSV
+    df = ImportData(filepath, i)
+    int_add = np.sum(df["Time (sec)"].values <= 12)
+    df["Gear"] = df["Gear"].shift(periods=int_add, fill_value=df["Gear"][0])
+    # Needing to fix the timeseries, using the same method as MATLAB
+    df["Time (sec)"] = np.linspace(
+        np.min(df["Time (sec)"]), np.max(df["Time (sec)"]), len(df.index)
+    )
+    # Same for min
+    df["Time (min)"] = np.linspace(
+        np.min(df["Time (min)"]), np.max(df["Time (min)"]), len(df.index)
+    )
+
+    # Calling GetStrokes and GetInfo for both left and right
+    df_peaks_left = GetStrokes(df, "Left")
+    df_peaks_right = GetStrokes(df, "Right")
+    df_info_left = GetInfo(df_peaks_left)
+    df_info_right = GetInfo(df_peaks_right)
+    # Adding the time between nearest left and right pulling
+    df_info_left, df_info_right = add_left_and_right_diff(
+        df_peaks_left, df_peaks_right, df_info_left, df_info_right
+    )
+    left_0 = df_peaks_left[df_peaks_left["Gear"] == 0][10:90]
+    left_0 = left_0["Peak time"].values
+    right_0 = df_info_left[df_info_left["Gear"] == 0][10:90]
+    right_0 = right_0["Other pole time"].values
+    x = left_0
+    y = left_0 - right_0
+    k, m = np.polyfit(x, y, 1)
+    time = df["Time (sec)"].values
+    comp = k * np.linspace(np.min(time), np.max(time), len(time)) + m
+    time = time - comp
+    df["Force right (N)"] = np.interp(
+        time, df["Time (sec)"], df["Force right (N)"], left=0, right=0
+    )
+    df["Time (sec)"] = time
+    df["Time (min)"] = time / 60
+
+    df_peaks_left = GetStrokes(df, "Left")
+    df_peaks_right = GetStrokes(df, "Right")
+
+    df_info_left = GetInfo(df_peaks_left)
+    df_info_right = GetInfo(df_peaks_right)
+
+    # Adding the time between nearest left and right pulling
+    df_info_left, df_info_right = add_left_and_right_diff(
+        df_peaks_left, df_peaks_right, df_info_left, df_info_right
+    )
+
     # Saving it all to a dictionary
     dataframe_dict = {
         "df": df,
@@ -133,11 +283,14 @@ def generate_stroke_dataframe(filepath, i):
 
 
 def ImportData(filepath, skier):
-    """Function to read the CSV with correct headers
+    """
+    Function to read the CSV with correct headers
+
     Parameters
     ----------
     filepath : str
         The file location of the CSV-file
+
     skier : int
         The skier identity
 
@@ -180,26 +333,35 @@ def GetStrokes(
     cutoff_start=2,
     cutoff_end=2,
 ):
-    """Gets the individual pullings frome the timeseries dataframe
+    """
+    Gets the individual pullings frome the timeseries dataframe
+
     Parameters
     ----------
     df : dataframe
         Dataframe over timeseries
+
     pole: str
         Either "Left" or "Right"
+
     height : float
         Procentage threshold of max force that makes the peak detected
+
     distance: int
         Minimum distance between individual pullings
+
     rel_height : float
         Procentage of peak height for detecting where a peak starts. This makes
         the width of the peak
+
     cutoff_start : float
         Time to cutoff from the begining of the dataframe before starting to
         detect peaks
+
     cufoff_end : float
         Time to cutoff from the end of the dataframe before starting to detect
         peaks
+
     Returns
     -------
     df_peaks : dataframe
@@ -275,6 +437,7 @@ def GetStrokes(
 
 def GetInfo(df_peaks):
     """ Generating data over individual pulling with a non timeseries matter
+
     Parameters
     ----------
     df_peaks : dataframe
@@ -320,20 +483,26 @@ def add_left_and_right_diff(
 ):
     """ Algoritm for getting procentage between left and right pullings of the
     whole stroke and height difference
+
     Parameters
     ----------
     df_peaks_left : dataframe
         Timeseries data for individual left pullings
+
     df_peaks_right : dataframe
         Timeseries data for individual right pullings
+
     df_info_left : dataframe
         Non timeseries data for individual left pullings
+
     df_info_right : dataframe
         Non timeseries data for individual right pullings
+
     Returns
     -------
     df_info_left : dataframe
         Non timeseries data for individual left pullings
+
     df_info_right : dataframe
         Non timeseries data for individual right pullings
     """
@@ -400,15 +569,19 @@ def delete_outlier(
     quantile=0.001,
 ):
     """ Function for deleting outliers
+
     Parameters
     ----------
     trim_features : str list
         The features that we want to delete outliers for
+
     number_of_oly_up : int
         Number of features that we wishes to only delete outliers from the
         largest values
+
     quantile : float
         What quantile we wishes to delete, both as quantile but also 1-quantile
+
     Returns
     -------
     df : dataframe
