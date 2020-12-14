@@ -26,7 +26,7 @@ df_sub = df_info[
 #    df_sub = df_sub.sample(7000)
 ds = hv.Dataset(df_sub).groupby("Gear").overlay()
 point_grid = gridmatrix(ds, chart_type=hv.Points)
-point_grid.opts(opts.Points(size=1, alpha=0.3, cmap="Plasma"))
+point_grid.opts(opts.Points(size=1, alpha=0.3, cmap="plasma"))
 legend = point_grid[("Frequency", "Time to other pole")].opts(
     xaxis=None,
     yaxis=None,
@@ -43,8 +43,8 @@ sns_plot = sns.pairplot(
     hue="Gear",
     diag_kind="hist",
     corner=True,
-    palette="flare",
-    plot_kws={"s": 2},
+    palette="plasma",
+    plot_kws={"s": 0.5, "alpha": 0.5, "linewidth": 0},
     height=1.5,
 )
-sns_plot.savefig("figures/Gait_analysis.png")
+sns_plot.savefig("figures/Gait_analysis.png", dpi=300)
