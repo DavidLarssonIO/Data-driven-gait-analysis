@@ -34,11 +34,13 @@ def split_train_test_data(df_info, skier_list, validation_skiers):
     print(f'Training Skiers : {train_skiers_list}')
     print(f'Validation Skiers : {val_skiers_list}')
 
-    X = df_info[df_info.columns.difference(['Pole', 'Other pole index', 'Gear','Peak time'])]
+    X = df_info[df_info.columns.difference(['Pole', 'Other pole time', 'Gear','Peak time'])]
     y = (df_info[['Gear','Skier']])
 
+    # Storing validation data separately which will later be used to plot comparison of prediction
     y_plot_data = df_info.loc[(df_info['Skier'].isin(val_skiers_list))]
 
+    # Creating training and validation sets based on random skiers stored above
     X_train = X.loc[(X['Skier'].isin(train_skiers_list))]
     X_valid = X.loc[(X['Skier'].isin(val_skiers_list))]
     y_train = y.loc[(y['Skier'].isin(train_skiers_list))]
@@ -303,6 +305,7 @@ def plot_confusion_matrix(CM_arr, title):
     file_prefix = f'Confusion Matrix : Accuracy of {title}'
     temp_labels = ['Gear 0', 'Gear 2', 'Gear 3', 'Gear 4']
 
+    # Calculation to convert predicted numbers to accuracy
     x = np.true_divide(CM_arr, CM_arr.sum(axis=1, keepdims=True))
 
     plt.figure()
