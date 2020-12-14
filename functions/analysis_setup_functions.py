@@ -1,15 +1,61 @@
 import pandas as pd
+import numpy as np
+import random as rnd
+from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import SelectFromModel
+from sklearn.model_selection import train_test_split
+from collections import Counter
 from sklearn.ensemble import RandomForestClassifier
+from pprint import pprint
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
+from sklearn.feature_selection import SelectFromModel
 from sklearn.model_selection import cross_val_score, cross_val_predict
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.model_selection import KFold
 from sklearn import metrics
-import numpy as np
+from imblearn.combine import SMOTETomek
+
+
+
+# --------------------------------------------------------------------------------------------------    
+# Function to generate the trianing and validation datasets based on the number of skiers specified
+# for the split. Skiers are randomly picked from the list of available 10 skiers. Everytime this
+# function is called, a random set of skiers are split into these sets.
+
+def split_train_test_data(df_info, skier_list, validation_skiers):
+
+    print('\nRandomly Splitting Skiers into Training and Validation Sets...')
+    val_skiers_list = rnd.sample(list(skier_list), validation_skiers)
+    train_skiers_list = list(set(skier_list) - set(val_skiers_list))
+
+    print(f'Training Skiers : {train_skiers_list}')
+    print(f'Validation Skiers : {val_skiers_list}')
+
+    X = df_info[df_info.columns.difference(['Pole', 'Other pole index', 'Gear','Peak time'])]
+    y = (df_info[['Gear','Skier']])
+
+    y_plot_data = df_info.loc[(df_info['Skier'].isin(val_skiers_list))]
+
+    X_train = X.loc[(X['Skier'].isin(train_skiers_list))]
+    X_valid = X.loc[(X['Skier'].isin(val_skiers_list))]
+    y_train = y.loc[(y['Skier'].isin(train_skiers_list))]
+    y_valid = y.loc[(y['Skier'].isin(val_skiers_list))]
+
+    X_train = X_train[X_train.columns.difference(['Skier'])]
+    X_valid = X_valid[X_valid.columns.difference(['Skier'])]
+    y_train = y_train[y_train.columns.difference(['Skier'])]
+    y_train = y_train.values.ravel()
+    y_valid = y_valid[y_valid.columns.difference(['Skier'])]
+    y_valid = y_valid.values.ravel()
+
+    #print('Dataframe Sizes:')
+    #print(X_train.shape, X_valid.shape, y_train.shape, y_valid.shape)
+    return X_train, X_valid, y_train, y_valid, y_plot_data, train_skiers_list, val_skiers_list
+
+
 
 # --------------------------------------------------------------------------------------------------    
 # Function that will evaluate the selected model and return performance metrics for analysis
@@ -19,6 +65,7 @@ import numpy as np
 
 def evaluate(model, X_valid, y_valid, title):
     
+    print('Evaluating Validation Data with 5-fold CV...\n')
     # Build the k-fold cross-validator
     kfold = KFold(n_splits=5)
     all_y_pred = cross_val_predict(model, X_valid, y_valid, cv=kfold)
@@ -39,31 +86,221 @@ def evaluate(model, X_valid, y_valid, title):
     results[8] = np.sqrt(metrics.mean_squared_error(y_valid, all_y_pred))
     results[9] = model.score(X_valid,y_valid)
 
+    results = np.around(results, decimals=3)
+    
     print(f'Performance Metrics for {title} :')
     print('----------------------------------------------------------')
     print('Accuracy Score:', results[0])
     print('Balanced Accuracy Score:', results[1])
-    print('Precision: (Macro Avg)', results[2])
-    print('Recall: (Macro Avg)', results[3])
-    print('F-1 Score (Macro Avg):', results[4])
     print('MCC Score:', results[5])
-    print('Mean Absolute Error:', results[6])
-    print('Mean Squared Error:', results[7])
-    print('Root Mean Squared Error:', results[8])
+    print('F-1 Score (Macro Avg):', results[4])
     print('Classifier Score:', results[9])
-
-    print('\nClassification Report: \n', metrics.classification_report(y_valid, all_y_pred))
+    #print('Precision: (Macro Avg)', results[2])
+    #print('Recall: (Macro Avg)', results[3])
+    #print('Mean Absolute Error:', results[6])
+    #print('Mean Squared Error:', results[7])
+    #print('Root Mean Squared Error:', results[8])
     
-    return results, all_y_pred, CM_arr
+    class_report = metrics.classification_report(y_valid, all_y_pred)
+    
+    print('\nClassification Report: \n', class_report)
+    
+    return results, all_y_pred, CM_arr, class_report
 
 
+# --------------------------------------------------------------------------------------------------    
+# A function to perform hyperparameter tuning for the random forest classifier model
+
+def tune_random_forest(X_train, y_train):
+    
+    print('Performing Hyperparameter Tuning...\n')
+    #-----------------------------------------------------------------------------------------
+    # SETTING UP PARAMETERS FOR HYPERPARAMETER TUNING
+    #-----------------------------------------------------------------------------------------
+    # Specifiying the range of Number of trees in the random forest
+    n_estimators = [int(x) for x in np.linspace(start = 6, stop = 120, num = 6)]
+
+    # Specifying the range of Maximum number of levels in tree
+    max_depth = [int(x) for x in np.linspace(start = 10, stop = 100, num = 10)]
+    max_depth.append(None)
+
+    # Specifying the range of Minimum number of samples required to split a node
+    min_samples_split = [1, 2, 4, 6]
+
+    # Specifying the range of Minimum number of samples required at each leaf node
+    min_samples_leaf = [1, 2, 4, 6]
+
+    # Specifying the Method of selecting samples for training each tree
+    bootstrap = [True, False]
+
+    # Specifying the Class weight
+    class_weight = ['balanced', 'balanced_subsample']
+
+    # Now, we create the random grid that would store all the values as specified above
+    random_grid = {'n_estimators': n_estimators,
+                   'max_depth': max_depth,
+                   'min_samples_split': min_samples_split,
+                   'min_samples_leaf': min_samples_leaf,
+                   'bootstrap': bootstrap,
+                  'class_weight' : class_weight
+                  }
 
 
+    #-----------------------------------------------------------------------------------------
+    # PERFORMING HYPERPARAMETER TUNING
+    #-----------------------------------------------------------------------------------------
+    # Now, using the random grid created above, we start to search for the best hyperparameters
+
+    # First we create the base model that we want to tune by specifying no parameters
+    rf = RandomForestClassifier()
+
+    # Random search of parameters, using 3 fold cross validation, 
+    # search across 100 different combinations, and use all available cores
+    rf_random = RandomizedSearchCV(estimator=rf, param_distributions=random_grid,
+                                  n_iter = 50, scoring='balanced_accuracy', 
+                                  cv = 3,
+                                   #verbose=2,
+                                   # random_state=42,
+                                   n_jobs=-1,
+                                  return_train_score=True)
+
+    # Fit the random search model
+    rf_random.fit(X_train, y_train);
+
+    print('Best Parameters after Randomized Search CV : ')
+    print(rf_random.best_params_)
+    print('\n')
+
+    #-----------------------------------------------------------------------------------------
+    # EVALUATE MODEL WITH CHOSEN PARAMETERS
+    #-----------------------------------------------------------------------------------------
+    # Build the Random Forest Classifier model based on best set of parameters chosen above
+    rfc = rf_random.best_estimator_
+    
+    # Fit the model with training data
+    rfc.fit(X_train, y_train)
+
+    return rfc, rf_random.best_params_
+
+
+# --------------------------------------------------------------------------------------------------    
+# Function to perform hyperparameter tuning for a Multiclass Logistic Regression Problem
+
+def tune_logistic_regression(X_train, y_train):
+
+    print('Performing Hyperparameter Tuning...\n')
+    #-----------------------------------------------------------------------------------------
+    # SETTING UP PARAMETERS FOR HYPERPARAMETER TUNING
+    #-----------------------------------------------------------------------------------------
+    # Create regularization penalty space
+    penalty = ['l1', 'l2', 'elasticnet']
+
+    # Specify if Dual or primal formulation
+    dual=[True,False]
+
+    # Create regularization hyperparameter space
+    C = np.logspace(0, 2.5, 15)
+
+    # define grid for different class weights
+    balance=['balanced']
+
+    #Specify the solver
+    solver = ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga']
+    
+    # Specifying the range of maximum oterations to enable convergence
+    max_iter = np.linspace(100, 10000, 100).astype(int)
+
+    param_grid = dict(dual=dual, class_weight=balance, C=C, solver=solver, penalty=penalty, max_iter=max_iter)
+
+
+    #-----------------------------------------------------------------------------------------
+    # PERFORMING HYPERPARAMETER TUNING
+    #-----------------------------------------------------------------------------------------
+    # Now, using the random grid created above, we start to search for the best hyperparameters
+
+    # First we create the base model that we want to tune by specifying no parameters
+    lr = LogisticRegression()
+
+    lr_random = RandomizedSearchCV(estimator=lr, param_distributions=param_grid,
+                                   n_jobs=-1, scoring='balanced_accuracy', cv = 3,
+                                  return_train_score=True)
+
+    #lr_random_result = lr_random.fit(X_train, y_train)
+    lr_random.fit(X_train, y_train)
+
+
+    print('Best Parameters after Randomized Search CV : ')
+    print(lr_random.best_params_)
+    print('\n')
+
+    #-----------------------------------------------------------------------------------------
+    # EVALUATE MODEL WITH CHOSEN PARAMETERS
+    #-----------------------------------------------------------------------------------------
+    # Build the Random Forest Classifier model based on best set of parameters chosen above
+    lr = lr_random.best_estimator_
+
+    # Fit the model with training data
+    lr.fit(X_train, y_train)
+
+    return lr, lr_random.best_params_
+    
+    
+    
+    
+    
+    
+
+# --------------------------------------------------------------------------------------------------    
+# Function to plot the original gear profile versus the predicted gears to understand 
+# which of the data points from the original data were inccorectly classified
+# Viewing this plot helps to understand accuracy of the model results
+# Set individual_skier=True if you want the plots to be returned individually for all
+# skiers of the validation dataset
+
+def plot_predicted_gear_comparison(y_plot_data,all_y_pred,individual_skier=False):
+
+    plot_df = y_plot_data
+    plot_df = plot_df.assign(Predicted_Gear=all_y_pred)
+    skier_list = plot_df['Skier'].unique()
+    
+    if individual_skier:
+
+        for i in range(0,len(skier_list)):
+            temp_df = plot_df.loc[(plot_df['Skier'] == skier_list[i])]
+            fig, axs = plt.subplots(figsize=(15,4))
+            axs.set_facecolor((248/255, 248/255, 248/255))
+            plt.title(f'Skier {skier_list[i]} : Original vs Predicted Gears Comparison')
+            plt.xlabel('Observations')
+            plt.plot(range(0,temp_df.shape[0]), temp_df['Gear'],alpha=0.75, color='green', label='Original Gear Profile')
+            plt.scatter(range(0,temp_df.shape[0]), temp_df['Predicted_Gear'],alpha=0.5, c=temp_df.Predicted_Gear, cmap='plasma', label='Predicted Gears')
+            axs.set_yticks([-1,0,2,3,4])
+            axs.set_yticklabels(['','Gear 0', 'Gear 2', 'Gear 3', 'Gear 4'])
+            plt.legend(loc='lower left')
+            plt.show()
+        
+    else:    
+
+        temp_df = plot_df
+
+        fig, axs = plt.subplots(figsize=(17,5))
+        axs.set_facecolor((248/255, 248/255, 248/255))
+        plt.title(f'All Validation Skiers Combined : Original vs Predicted Gears Comparison')
+        plt.xlabel('Observations')
+        plt.plot(range(0,temp_df.shape[0]), temp_df['Gear'],alpha=0.75, color='green', label='Original Gear Profile')
+        plt.scatter(range(0,temp_df.shape[0]), temp_df['Predicted_Gear'],alpha=0.5, c=temp_df.Predicted_Gear, cmap='plasma', label='Predicted Gears')
+        axs.set_yticks([-1,0,2,3,4])
+        axs.set_yticklabels(['','Gear 0', 'Gear 2', 'Gear 3', 'Gear 4'])
+        plt.legend(loc='lower left')
+        plt.show()
+    
+
+    
+    
 # --------------------------------------------------------------------------------------------------    
 # Function to plot the confusion matrix for the evaluated models
 
 def plot_confusion_matrix(CM_arr, title):
-    file_prefix = f'Confusion Matrix : {title}'
+    file_prefix = f'Confusion Matrix : Accuracy of {title}'
     temp_labels = ['Gear 0', 'Gear 2', 'Gear 3', 'Gear 4']
 
     x = np.true_divide(CM_arr, CM_arr.sum(axis=1, keepdims=True))
@@ -123,8 +360,9 @@ def scale_dataset(df):
 
     return data
 
-# --------------------------------------------------------------------------------------------------    
 
+
+# --------------------------------------------------------------------------------------------------    
 # Creating a function to plot all the features of a random forest classifier sorted by 
 # feature importance. Takes in the model as an argument and plots the features in 
 # descending order of their importance as calculated by the 'feature importance' feature of an RFC
