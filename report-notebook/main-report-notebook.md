@@ -31,8 +31,6 @@
 
 ## Contents
 You may click on these links to navigate to different sections of the notebook directly. 
-
-*(These links may not work when viewed on GitHub directly, you may download and open the file on jupyter or equivalient for this functionality)*
 1. [Running the Random Forest Classifier Method](#rfc)
 2. [Summary of Random Forest Classifier](#rfc_summary)
 3. [Observations of Random Forest Classifier](#rfc_obs)
