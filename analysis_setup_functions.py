@@ -16,7 +16,8 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.model_selection import KFold
 from sklearn import metrics
-from imblearn.combine import SMOTETomek
+from IPython.display import HTML
+
 
 
 
@@ -123,7 +124,14 @@ def evaluate(model,X_train, y_train, X_valid, y_valid, title):
     results = np.ndarray(shape=(11))
     CM_arr = metrics.confusion_matrix(y_valid, all_y_pred)
 
-    plot_confusion_matrix(CM_arr, title)
+    # Create a dataframe that will store results in one table
+    results_df = pd.DataFrame(columns=list(['Accuracy',
+                                            'Balanced Accuracy',
+                                            'Precision (Macro Avg)',
+                                            'Recall (Macro Avg)',
+                                            'F1 (Macro Avg)',
+                                            'MCC',
+                                            'Classifier Score']))
     
     results[0] = metrics.accuracy_score(y_valid, all_y_pred) #Accuracy
     results[1] = metrics.balanced_accuracy_score(y_valid, all_y_pred) #Balanced Accuracy
@@ -140,21 +148,31 @@ def evaluate(model,X_train, y_train, X_valid, y_valid, title):
     
     print(f'Performance Metrics for {title} :')
     print('----------------------------------------------------------')
-    print('Accuracy Score:', results[0])
-    print('Balanced Accuracy Score:', results[1])
-    print('MCC Score:', results[5])
-    print('F-1 Score (Macro Avg):', results[4])
-    print('Classifier Score:', results[9])
+    #print('Accuracy Score:', results[0])
+    #print('Balanced Accuracy Score:', results[1])
+    #print('MCC Score:', results[5])
+    #print('F-1 Score (Macro Avg):', results[4])
+    #print('Classifier Score:', results[9])
     #print('Precision: (Macro Avg)', results[2])
     #print('Recall: (Macro Avg)', results[3])
     #print('Mean Absolute Error:', results[6])
     #print('Mean Squared Error:', results[7])
     #print('Root Mean Squared Error:', results[8])
     
-    class_report = metrics.classification_report(y_valid, all_y_pred)
+    temp_all_metrics =  ["" for x in range(7)]
+    temp_all_metrics[0:6] = results[0:6]
+    temp_all_metrics[6] = results[9]
+
+    # Print Results variable in a cleaner compact horizontal manner
+    results_df.loc[len(results_df)] = temp_all_metrics
+    display( HTML( results_df.to_html().replace("\\n","<br>") ) )
+
     
+    class_report = metrics.classification_report(y_valid, all_y_pred)
     print('\nClassification Report: \n', class_report)
     
+    plot_confusion_matrix(CM_arr, title)
+
     return results, all_y_pred, CM_arr, class_report
 
 
@@ -171,7 +189,7 @@ def tune_random_forest(X_train, y_train):
     n_estimators = [int(x) for x in np.linspace(start = 6, stop = 120, num = 6)]
 
     # Specifying the range of Maximum number of levels in tree
-    max_depth = [int(x) for x in np.linspace(start = 10, stop = 100, num = 10)]
+    max_depth = [int(x) for x in np.linspace(start = 10, stop = 200, num = 10)]
     max_depth.append(None)
 
     # Specifying the range of Minimum number of samples required to split a node
@@ -207,7 +225,7 @@ def tune_random_forest(X_train, y_train):
     # Random search of parameters, using 3 fold cross validation, 
     # search across 100 different combinations, and use all available cores
     rf_random = RandomizedSearchCV(estimator=rf, param_distributions=random_grid,
-                                  n_iter = 50, scoring='balanced_accuracy', 
+                                  n_iter = 100, scoring='balanced_accuracy', 
                                   cv = 3,
                                    #verbose=2,
                                    # random_state=42,
@@ -296,8 +314,83 @@ def tune_logistic_regression(X_train, y_train):
     
     
     
+# --------------------------------------------------------------------------------------------------    
+# Function that wil perform a majority filtering on the list of predicted labels based on the width 
+#  the window width. It calculates the label occurring most frequently in the current window and
+# sets the current value to that label.
+# This function can be useful to smooth the predicted labels based on surrounding values.
+
+def majority_filter_traditional(seq, width):
+    offset = width // 2
+    seq = [0] * offset + seq
+    result = []
+    for i in range(len(seq) - offset):
+        a = seq[i:i+width]
+        result.append(max(set(a), key=a.count))
+    return result
+ 
+
     
+# --------------------------------------------------------------------------------------------------    
+# Function that uses the above majority filtering technique to refine the predicted labels and
+# calculate the performance metrics again to determine if there has been an improvement in the 
+# model due to this method.
     
+def refine_predicted_labels( y_valid, all_y_pred, title):
+    
+    all_y_pred = majority_filter_traditional(list(all_y_pred), 15)  
+
+    results = np.ndarray(shape=(11))
+    CM_arr = metrics.confusion_matrix(y_valid, all_y_pred)
+
+    # Create a dataframe that will store results in one table
+    results_df = pd.DataFrame(columns=list(['Accuracy',
+                                            'Balanced Accuracy',
+                                            'Precision (Macro Avg)',
+                                            'Recall (Macro Avg)',
+                                            'F1 (Macro Avg)',
+                                            'MCC']))
+    
+    results[0] = metrics.accuracy_score(y_valid, all_y_pred) #Accuracy
+    results[1] = metrics.balanced_accuracy_score(y_valid, all_y_pred) #Balanced Accuracy
+    results[2] = metrics.precision_score(y_valid, all_y_pred,average='macro')   #Precision
+    results[3] = metrics.recall_score(y_valid, all_y_pred,average='macro')   #Sensitivity/Recall/True positive rate (TPR)
+    results[4] = metrics.f1_score(y_valid, all_y_pred, average='macro')
+    results[5] = metrics.matthews_corrcoef(y_valid, all_y_pred)
+    results[6] = metrics.mean_absolute_error(y_valid, all_y_pred)
+    results[7] = metrics.mean_squared_error(y_valid, all_y_pred)
+    results[8] = np.sqrt(metrics.mean_squared_error(y_valid, all_y_pred))
+
+    results = np.around(results, decimals=3)
+    
+    print(f'Performance Metrics for {title} :')
+    print('----------------------------------------------------------')
+    #print('Accuracy Score:', results[0])
+    #print('Balanced Accuracy Score:', results[1])
+    #print('MCC Score:', results[5])
+    #print('F-1 Score (Macro Avg):', results[4])
+    #print('Classifier Score:', results[9])
+    #print('Precision: (Macro Avg)', results[2])
+    #print('Recall: (Macro Avg)', results[3])
+    #print('Mean Absolute Error:', results[6])
+    #print('Mean Squared Error:', results[7])
+    #print('Root Mean Squared Error:', results[8])
+    
+    temp_all_metrics =  ["" for x in range(6)]
+    temp_all_metrics[0:6] = results[0:6]
+
+    # Print Results variable in a cleaner compact horizontal manner
+    results_df.loc[len(results_df)] = temp_all_metrics
+    display( HTML( results_df.to_html().replace("\\n","<br>") ) )
+
+    
+    class_report = metrics.classification_report(y_valid, all_y_pred)
+    print('\nClassification Report: \n', class_report)
+    
+    plot_confusion_matrix(CM_arr, title)
+
+    return results, all_y_pred, CM_arr, class_report
+
     
 
 # --------------------------------------------------------------------------------------------------    
