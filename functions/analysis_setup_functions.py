@@ -25,36 +25,81 @@ from imblearn.combine import SMOTETomek
 # for the split. Skiers are randomly picked from the list of available 10 skiers. Everytime this
 # function is called, a random set of skiers are split into these sets.
 
-def split_train_test_data(df_info, skier_list, validation_skiers):
+def split_train_test_data(df_info, skier_list, validation_skiers, to_train=False, special_case=99):
 
-    print('\nRandomly Splitting Skiers into Training and Validation Sets...')
-    val_skiers_list = rnd.sample(list(skier_list), validation_skiers)
-    train_skiers_list = list(set(skier_list) - set(val_skiers_list))
+    print('**********************************************************************************************')
+    
+    val_skiers_list = []
+    train_skiers_list = []
+    
+    if to_train:
 
-    print(f'Training Skiers : {train_skiers_list}')
-    print(f'Validation Skiers : {val_skiers_list}')
+        print('Randomly Splitting Data into Training and Validation Sets...')
 
-    X = df_info[df_info.columns.difference(['Pole', 'Other pole time', 'Gear','Peak time'])]
-    y = (df_info[['Gear','Skier']])
+        X = df_info[df_info.columns.difference(['Skier','Pole', 'Other pole time', 'Gear','Peak time'])]
+        y = (df_info[['Gear']])
+        y_plot_data = y
 
-    # Storing validation data separately which will later be used to plot comparison of prediction
-    y_plot_data = df_info.loc[(df_info['Skier'].isin(val_skiers_list))]
+        X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.3, stratify=y)
+        y_train = y_train.values.ravel()
+        y_valid = y_valid.values.ravel()
 
-    # Creating training and validation sets based on random skiers stored above
-    X_train = X.loc[(X['Skier'].isin(train_skiers_list))]
-    X_valid = X.loc[(X['Skier'].isin(val_skiers_list))]
-    y_train = y.loc[(y['Skier'].isin(train_skiers_list))]
-    y_valid = y.loc[(y['Skier'].isin(val_skiers_list))]
+        print(X_train.shape, X_valid.shape, y_train.shape, y_valid.shape)
+        
+    else:
+        print('Randomly Splitting Skiers into Training and Validation Sets...')
+        val_skiers_list = rnd.sample(list(skier_list), validation_skiers)
+        
+        if special_case == 0:
+            print('ADDITIONAL EXPERIMENT!...')
+            print('Selecting Shortest Skiers for Validation...')
+            print('Shortest Skiers are also all women, have shortest pole length and lowest mass...')
+            val_skiers_list = [10,7,4]
 
-    X_train = X_train[X_train.columns.difference(['Skier'])]
-    X_valid = X_valid[X_valid.columns.difference(['Skier'])]
-    y_train = y_train[y_train.columns.difference(['Skier'])]
-    y_train = y_train.values.ravel()
-    y_valid = y_valid[y_valid.columns.difference(['Skier'])]
-    y_valid = y_valid.values.ravel()
+        if special_case == 1:
+            print('ADDITIONAL EXPERIMENT!...')
+            print('Selecting Tallest Skiers for Validation...')
+            print('Tallest Skiers have longest pole length and high mass...')
+            val_skiers_list = [1,2,3]
 
-    #print('Dataframe Sizes:')
-    #print(X_train.shape, X_valid.shape, y_train.shape, y_valid.shape)
+        if special_case == 2:
+            print('ADDITIONAL EXPERIMENT!...')
+            print('Selecting Skiers with Lowest Body Mass Index (BMI) for Validation...')
+            val_skiers_list = [2,8,9,10]
+
+        if special_case == 3:
+            print('ADDITIONAL EXPERIMENT!...')
+            print('Selecting Skiers with Highest Body Mass Index (BMI) for Validation...')
+            val_skiers_list = [1,3,4,7]
+
+            
+        train_skiers_list = list(set(skier_list) - set(val_skiers_list))
+
+        print(f'Training Skiers : {train_skiers_list}')
+        print(f'Validation Skiers : {val_skiers_list}')
+
+        X = df_info[df_info.columns.difference(['Pole', 'Other pole time', 'Gear','Peak time'])]
+        y = (df_info[['Gear','Skier']])
+
+        # Storing validation data separately which will later be used to plot comparison of prediction
+        y_plot_data = df_info.loc[(df_info['Skier'].isin(val_skiers_list))]
+
+        # Creating training and validation sets based on random skiers stored above
+        X_train = X.loc[(X['Skier'].isin(train_skiers_list))]
+        X_valid = X.loc[(X['Skier'].isin(val_skiers_list))]
+        y_train = y.loc[(y['Skier'].isin(train_skiers_list))]
+        y_valid = y.loc[(y['Skier'].isin(val_skiers_list))]
+
+        X_train = X_train[X_train.columns.difference(['Skier'])]
+        X_valid = X_valid[X_valid.columns.difference(['Skier'])]
+        y_train = y_train[y_train.columns.difference(['Skier'])]
+        y_train = y_train.values.ravel()
+        y_valid = y_valid[y_valid.columns.difference(['Skier'])]
+        y_valid = y_valid.values.ravel()
+
+        #print('Dataframe Sizes:')
+        #print(X_train.shape, X_valid.shape, y_train.shape, y_valid.shape)
+        
     return X_train, X_valid, y_train, y_valid, y_plot_data, train_skiers_list, val_skiers_list
 
 
@@ -65,9 +110,12 @@ def split_train_test_data(df_info, skier_list, validation_skiers):
 # This is going to be used as a benchmark to evaluate how much the performance of the model has improved
 # based on hyperparameter tuning.
 
-def evaluate(model, X_valid, y_valid, title):
+def evaluate(model,X_train, y_train, X_valid, y_valid, title):
     
-    print('Evaluating Validation Data with 5-fold CV...\n')
+    # Fit the model with training data
+    model.fit(X_train, y_train)
+
+    print('Evaluating Data with 5-fold CV...\n')
     # Build the k-fold cross-validator
     kfold = KFold(n_splits=5)
     all_y_pred = cross_val_predict(model, X_valid, y_valid, cv=kfold)
@@ -384,7 +432,7 @@ def plot_feature_importance(classifier_obj, X_train, y_train):
     fig = plt.figure(figsize=(15, 5))
 
     plt.plot(list(imp_score[:,1]),list(imp_score[:,0].astype(float)), label='Feature Importance')
-    plt.axvline(imp_features, color='r', linestyle='--', label='Maximum Selected Features = {} for Analysis'.format(imp_features))
+    #plt.axvline(imp_features, color='r', linestyle='--', label='Maximum Selected Features = {} for Analysis'.format(imp_features))
     plt.xlabel("No. of Features")
     plt.ylabel("Feature Importance Score")
     plt.title("Dataset Features based on Importance Score")
@@ -394,3 +442,6 @@ def plot_feature_importance(classifier_obj, X_train, y_train):
     #plt.savefig('RFC Feature Selection Plot', bbox_to_anchor='tight')
     plt.show()
     #plt.close()
+    
+    print('\nFeature Importance Scores:\n')
+    print(imp_score)
