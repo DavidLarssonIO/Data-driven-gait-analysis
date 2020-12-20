@@ -11,8 +11,8 @@ Power meters are used to improve athlete performance and in cross-country skiing
 ## In this Package:
 Below are the files used in our project with brief descriptions of what functions they serve. You may click on the links provided to directly navigate to these files. 
 
-1. [functions/**analysis_setup_functions.py**](https://github.com/DavidLarssonIO/Data-driven-gait-analysis/blob/master/functions/analysis_setup_functions.py) : File containing all functions to perform classification, such as hyperparameter tuning, training, testing and visualization
-2. [functions/**dataframe_functions.py**](https://github.com/DavidLarssonIO/Data-driven-gait-analysis/blob/master/functions/dataframe_functions.py) : File containing all data processing functions for raw data, such as cleaning, creating calculated fields, calibrating etc.
+1. [**analysis_setup_functions.py**](https://github.com/DavidLarssonIO/Data-driven-gait-analysis/blob/master/analysis_setup_functions.py) : File containing all functions to perform classification, such as hyperparameter tuning, training, testing and visualization
+2. [**dataframe_functions.py**](https://github.com/DavidLarssonIO/Data-driven-gait-analysis/blob/master/dataframe_functions.py) : File containing all data processing functions for raw data, such as cleaning, creating calculated fields, calibrating etc.
 3. [**main-data-classification.ipynb**](https://github.com/DavidLarssonIO/Data-driven-gait-analysis/blob/master/main-data-classification.ipynb) : Main notebook where we load data and run our classification models. This notebook imports all functions from the above two files and uses them. You may re-run this notebook for new data, further instructions on how to run the code are provided within the notebook.
 4. [report-notebook/**main-report-notebook.md**](https://github.com/DavidLarssonIO/Data-driven-gait-analysis/blob/master/report-notebook/main-report-notebook.md) : This is the markdown/report version of the Jupyter notebook with our results, discussions and observations for future reference. 
 
