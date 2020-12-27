@@ -412,12 +412,13 @@ def plot_predicted_gear_comparison(y_plot_data,all_y_pred,individual_skier=False
             temp_df = plot_df.loc[(plot_df['Skier'] == skier_list[i])]
             fig, axs = plt.subplots(figsize=(15,4))
             axs.set_facecolor((248/255, 248/255, 248/255))
-            plt.title(f'Skier {skier_list[i]} : Original vs Predicted Gears Comparison')
+            #plt.title(f'Skier {skier_list[i]} : Original vs Predicted Gears Comparison')
             plt.xlabel('Observations')
-            plt.plot(range(0,temp_df.shape[0]), temp_df['Gear'],alpha=0.75, color='green', label='Original Gear Profile')
+            plt.plot(range(0,temp_df.shape[0]), temp_df['Gear'],alpha=0.75, color='green', label='True Gear Profile')
             plt.scatter(range(0,temp_df.shape[0]), temp_df['Predicted_Gear'],alpha=0.5, c=temp_df.Predicted_Gear, cmap='plasma', label='Predicted Gears')
             axs.set_yticks([-1,0,2,3,4])
-            axs.set_yticklabels(['','Gear 0', 'Gear 2', 'Gear 3', 'Gear 4'])
+            #axs.set_yticklabels(['','Gear 0', 'Gear 2', 'Gear 3', 'Gear 4'])
+            axs.set_yticklabels(['','Gear 0 \n (Double \n Poling)', 'Gear 2', 'Gear 3', 'Gear 4'])
             plt.legend(loc='lower left')
             plt.show()
         
@@ -427,12 +428,13 @@ def plot_predicted_gear_comparison(y_plot_data,all_y_pred,individual_skier=False
 
         fig, axs = plt.subplots(figsize=(17,5))
         axs.set_facecolor((248/255, 248/255, 248/255))
-        plt.title(f'All Validation Skiers Combined : Original vs Predicted Gears Comparison')
+        #plt.title(f'All Validation Skiers Combined : Original vs Predicted Gears Comparison')
         plt.xlabel('Observations')
-        plt.plot(range(0,temp_df.shape[0]), temp_df['Gear'],alpha=0.75, color='green', label='Original Gear Profile')
+        plt.plot(range(0,temp_df.shape[0]), temp_df['Gear'],alpha=0.75, color='green', label='True Gear Profile')
         plt.scatter(range(0,temp_df.shape[0]), temp_df['Predicted_Gear'],alpha=0.5, c=temp_df.Predicted_Gear, cmap='plasma', label='Predicted Gears')
         axs.set_yticks([-1,0,2,3,4])
-        axs.set_yticklabels(['','Gear 0', 'Gear 2', 'Gear 3', 'Gear 4'])
+        #axs.set_yticklabels(['','Gear 0', 'Gear 2', 'Gear 3', 'Gear 4'])
+        axs.set_yticklabels(['','Gear 0 \n (Double \n Poling)', 'Gear 2', 'Gear 3', 'Gear 4'])
         plt.legend(loc='lower left')
         plt.show()
     
@@ -443,15 +445,19 @@ def plot_predicted_gear_comparison(y_plot_data,all_y_pred,individual_skier=False
 # Function to plot the confusion matrix for the evaluated models
 
 def plot_confusion_matrix(CM_arr, title):
-    file_prefix = f'Confusion Matrix : Accuracy of {title}'
-    temp_labels = ['Gear 0', 'Gear 2', 'Gear 3', 'Gear 4']
+    #file_prefix = f'Confusion Matrix : Accuracy of {title}'
+    #temp_labels = ['Gear 0', 'Gear 2', 'Gear 3', 'Gear 4']
+    temp_labels = ['Gear 0 \n(Double \n Poling)', 'Gear 2', 'Gear 3', 'Gear 4']
+
 
     # Calculation to convert predicted numbers to accuracy
     x = np.true_divide(CM_arr, CM_arr.sum(axis=1, keepdims=True))
 
-    plt.figure()
-    sns.heatmap(x, annot=True,fmt='0.2%', xticklabels=temp_labels, yticklabels=temp_labels, cmap='YlGnBu')
-    plt.title(file_prefix)
+    #plt.figure()
+    figure = plt.subplots(figsize=(5.25,4.5))
+    
+    sns.heatmap(x, annot=True,fmt='0.2%', xticklabels=temp_labels, yticklabels=temp_labels, cmap='YlGnBu',cbar=False)
+    #plt.title(file_prefix)
     plt.xlabel("Predicted Gear")
     plt.ylabel("True Gear")
     #plt.gcf()
