@@ -1,4 +1,4 @@
-# Data Driven Gait Analysis
+# SPORTS ANALYTICS : Data Driven Gait Analysis
 ## Classification of Cross-Country Skiing Techniques Using Supervised Learning
 ### TRA105 Digitalization in Sports | Chalmers University of Technology
 #### Group Members:
