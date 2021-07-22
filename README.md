@@ -1,9 +1,8 @@
 # SPORTS ANALYTICS : Data Driven Gait Analysis
 ## Classification of Cross-Country Skiing Techniques Using Supervised Learning
-### TRA105 Digitalization in Sports | Chalmers University of Technology
 #### Group Members:
- - David Larsson [larsdav@student.chalmers.se]
  - Savya Sachi Gupta [savya@student.chalmers.se]
+ - David Larsson [larsdav@student.chalmers.se]
 ---
 
 Power meters are used to improve athlete performance and in cross-country skiing, power is dependent on technique (gear) used. In this project, we build a random forest classifier for predicting which gears a skier uses based on data from [Skisens](https://skisens.com) force measuring pole handles. 
